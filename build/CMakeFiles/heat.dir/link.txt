@@ -1,0 +1,1 @@
+mpicxx    -g -Wall -Wextra -Wshadow -std=c++11     CMakeFiles/heat.dir/heat.cpp.o  -o heat -rdynamic 

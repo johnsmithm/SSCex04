@@ -1,0 +1,1 @@
+/home/mosnoi/FAUbox/SCC/ex04/build/CMakeFiles/heat.dir
