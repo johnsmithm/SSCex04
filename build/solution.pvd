@@ -1,4 +1,0 @@
-<?xml version="1.0"?>
-<VTKFile type="Collection" version="0.1">
- <Collection><DataSet timestep="0" file="time_step_0"/><DataSet timestep="1" file="time_step_1"/></Collection>
-</VTKFile>

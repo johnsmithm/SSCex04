@@ -3,12 +3,14 @@
 #PBS -l nodes=4:ppn=32
 #PBS -q siwir
 #PBS -l walltime=0:05:00
-#PBS -M moshnoi2000@gmail.com -m abe
+#PBS -M mymail@mail.com -m abe
 #PBS -o $PBS_JOBNAME.out -e $PBS_JOBNAME.err
 . /etc/profile.d/modules.sh
 module load openmpi/1.8.1-ib
 module load gcc/4.9.2
-cd ~/git/SSC/GC/ex03
+cd ~/pathToFiles
+cd build
+cmake ../.
 make clean
 make
-mpirun -np 32 ./cg 10000 10000 100 -1
+mpirun -np 4 ./heat 10 10 10 0.01 3 0.00001 0.001 1 0

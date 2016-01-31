@@ -219,9 +219,10 @@ public :
 	 *
 	 */
 	void set_value( std::function<double(size_t,size_t)> f){
-		for(size_t i = 0;i < nyi; ++i) {
-			for(size_t j = 0;j < nxi; ++j) {
-                data[j+x+(y+i)*nxs] = f( j+offsetx, i+offsety);
+		//double pi = 3.141592653589793;
+		for(size_t i = 0;i < ny; ++i) {
+			for(size_t j = 0;j < nx; ++j) {
+                data[j+x+(y+i)*nxs] = f( j, i);
             }
         }
 	}
@@ -351,7 +352,7 @@ std::ostream & operator&( std::ostream & os, const Vector & v )
 	os<<"<?xml version=\"1.0\"?>\n<VTKFile type=\"UnstructuredGrid\" version=\"0.1\">\n <UnstructuredGrid>\n";
 	os<<"<Piece NumberOfPoints=\""+std::to_string(v.ny__()*v.nx__())+"\" NumberOfCells=\""+std::to_string(v.ny__()*v.nx__())+"\">\n";
 	os<<"<Points>\n<DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">\n";
-	std::cout<<v.hx__()<<"--------------\n";
+	//std::cout<<v.hx__()<<"--------------\n";
 	 for( size_t i=0; i < v.ny__(); ++i )
 		{
 			for( size_t j=0; j < v.nx__(); ++j )
@@ -396,13 +397,13 @@ public :
     /**
     * Construct the Matrix based on Stencil.
     */
-	Stencil(int nx1,int ny1, int * nbrs_,double tau_,double k_,double alfa_)
+	Stencil(int nx1,int ny1, int * nbrs_,double tau_,double k_,double alfa_, int sign=1)
 	:nx_(nx1+1),ny_(ny1+1),pi(3.141592653589793),tau(tau_), k(k_), alfa(alfa_),nbrs(nbrs_){
 	        double hx_ = 1.0/nx1;
             double hy_ = 1.0/ny1;
-            xst =  (tau*k)/(hx_*hx_);
-            yst =  (tau*k)/(hy_*hy_);
-            mst = 2.0/(hx_*hx_)+2.0/(hy_*hy_);          
+            xst =  sign*((tau*k)/(hx_*hx_))*(alfa>0?alfa:1);
+            yst =  sign*((tau*k)/(hy_*hy_))*(alfa>0?alfa:1);
+            mst = sign*(((tau*k*2.0)/(hx_*hx_))+((tau*k*2.0)/(hy_*hy_)))*(alfa>0?alfa:1)+1;          
             pg = (nx1+1)*(ny1+1);  
 	}
 	~Stencil(){}	
@@ -433,7 +434,7 @@ public :
 	double tau__()const{return tau;}
 	double k__()const{return k;}
 	double alfa__()const{return alfa;}
-	private :
+	public :
         // grid size.
 		int nx_,ny_,pg;
 		
@@ -678,7 +679,7 @@ int getHeight(int size){
 *
 * return residual.
 */
-void Expr_CG(int nx,int ny,int c,double eps, int py, int px, int nbrs[], int coords[], int cartrank, int tau, int k, double alfa1, Vector & uOld){
+void Expr_CG(int nx,int ny,int c,double eps, int py, int px, int nbrs[], int coords[], int cartrank, double tau, double k, double alfa1, Vector & uOld){
 	//MPI topology      
 	  /*int py = getHeight(nrpr);
       int px = nrpr/py;
@@ -796,18 +797,30 @@ void Expr_CG(int nx,int ny,int c,double eps, int py, int px, int nbrs[], int coo
     * When we update our points, we always begin with the point (1,1). Because we took care about right f initialization.
     */
 	Vector u(pg,nx_,ny_,nxi,nyi,nxs,nys,x,y);
+
 	//u(1,1)=1;
 	Vector f(pg,nx_,ny_,nxi,nyi,nxs,nys,x,y);
 	f = uOld;
 	u.set_offset(offsetx,offsety);
 	d.set_offset(offsetx,offsety);
 	//u = *ut;
+	//set boundaries
+	/*if(coords[0] == py - 1){//not sure
+			for(int i=0;i<nxi;++i)
+				u(i,nyi-1) = f(i,nyi-1);
+	}
+	if(coords[1] == px - 1){
+			for(int i=0;i<nyi;++i)
+				u(nxi-1,i) = f(nxi-1,i);
+	}*/
 	
 	Stencil A(nx, ny, nbrs, tau, k, alfa1);
 	double delta0 = 0, delta1 = 0, beta = 0, alfa = 0 ,scalar = 0;
 	//initialization end
 	double eps2 = eps * eps;
 	int nrIteration = 0;
+
+
 
 	
 	//CG
@@ -833,8 +846,38 @@ void Expr_CG(int nx,int ny,int c,double eps, int py, int px, int nbrs[], int coo
     if(cartrank == 0){
        std::cout<<"Number of iteration:"<<nrIteration<<";\n"
        			<<"Residual:"<<delta0<<"\n";
+       			/*std::cout<<"yst:"<<A.yst_()<<"\n"
+       					 <<"xst:"<<A.xst_()<<"\n"
+       					 <<"Aalfa:"<<A.alfa<<"\n"
+       					 <<"atau:"<<A.tau<<"\n"
+       					 <<"Ak:"<<A.k<<"\n"
+       					 <<"alfa:"<<alfa<<"\n"
+       					 <<"tau:"<<tau<<"\n"
+       					 <<"k:"<<k<<"\n";*/
     }
     uOld = u;
+
+
+   /* 		for( int i = 0; i < px*py; ++i )
+      {
+         if( cartrank == i )
+         {
+            std::cout<< z<< "------------------------------------------------------------\n"
+			          << "rank (Cartesian topology):         " << cartrank << "\n"
+                      << "Cartesian coordinates:             ( " << coords[0] << ", " << coords[1] << " )\n" 
+		              << "neighbors (x-direction, expected): " << nbrs[LEFT] << " (left), " << nbrs[RIGHT] << " (right)\n"
+                      << "neighbors (y-direction, expected): " << nbrs[DOWN] << " (down), " << nbrs[UP] << " (up)\n"   
+				      << "nx="<<nx_<<" ny="<<ny_<<"\n"
+				      << "nxs="<<nxs<<" nys="<<nys<<"\n"
+				      << "nxi="<<nxi<<" nyi="<<nyi<<"\n"					      
+				      << "x="<<x<<" y="<<y<<"\n"					      
+				      << "offsetx="<<offsetx<<" offsety="<<offsety<<"\n"
+				      << "alfa="<<alfa<<"\n"
+                      << std::endl;
+         }
+         MPI_Barrier( MPI_COMM_WORLD );
+      }
+*/
 	//return u;
 	//print
 	/*
